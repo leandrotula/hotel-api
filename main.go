@@ -8,6 +8,7 @@ import (
 	"github.com/gofiber/fiber/v2/log"
 	"github.com/leandrotula/hotelapi/api"
 	"github.com/leandrotula/hotelapi/store"
+	"github.com/leandrotula/hotelapi/util"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -25,11 +26,13 @@ func main() {
 		log.Fatal(fmt.Errorf("error connecting to MongoDB: %v", err))
 		panic(err)
 	}
-	userHandler := api.NewUserHandler(store.NewMongoUserStore(client))
+	userHandler := api.NewUserHandler(store.NewMongoUserStore(client, util.NewEncryptionService()))
 	givenPort := flag.String(flagVarName, defaultPort, "Port to serve on")
 	flag.Parse()
 	appServer := fiber.New()
 	appServer.Get("/v1/user/:id", userHandler.HandleGetUser)
+	appServer.Get("/v1/user", userHandler.HandleGetUsers)
+	appServer.Post("/v1/user", userHandler.HandleCreateUser)
 
 	err = appServer.Listen(*givenPort)
 	if err != nil {

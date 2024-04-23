@@ -2,6 +2,7 @@ package api
 
 import (
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/log"
 	"github.com/leandrotula/hotelapi/store"
 	"github.com/leandrotula/hotelapi/types"
 )
@@ -9,6 +10,7 @@ import (
 type UserHandler interface {
 	HandleGetUser(c *fiber.Ctx) error
 	HandleGetUsers(ctx *fiber.Ctx) error
+	HandleCreateUser(c *fiber.Ctx) error
 }
 
 func NewUserHandler(store store.UserStore) *UserApiHandler {
@@ -33,10 +35,26 @@ func (u *UserApiHandler) HandleGetUser(c *fiber.Ctx) error {
 }
 
 func (u *UserApiHandler) HandleGetUsers(ctx *fiber.Ctx) error {
-	return ctx.JSON(types.User{
-		ID:        "1",
-		FirstName: "foo",
-		LastName:  "bar",
-	})
 
+	allUsers, err := u.storeUser.GetAllUsers(ctx.Context())
+	if err != nil {
+		return err
+	}
+	return ctx.JSON(allUsers)
+
+}
+
+func (u *UserApiHandler) HandleCreateUser(c *fiber.Ctx) error {
+
+	var user types.CreateUserPayload
+	if err := c.BodyParser(&user); err != nil {
+		log.Fatal("Failed to parse body")
+		return err
+	}
+	userToInsert := types.NewCreateUser(&user)
+	insertedUser, err := u.storeUser.InsertUser(c.Context(), userToInsert)
+	if err != nil {
+		return err
+	}
+	return c.JSON(insertedUser)
 }
