@@ -31,8 +31,10 @@ func main() {
 	flag.Parse()
 	appServer := fiber.New()
 	appServer.Get("/v1/user/:id", userHandler.HandleGetUser)
+	appServer.Delete("/v1/user/:id", userHandler.HandleDeleteUser)
 	appServer.Get("/v1/user", userHandler.HandleGetUsers)
 	appServer.Post("/v1/user", userHandler.HandleCreateUser)
+	appServer.Put("/v1/user/:id", userHandler.HandleUpdateUser)
 
 	err = appServer.Listen(*givenPort)
 	if err != nil {

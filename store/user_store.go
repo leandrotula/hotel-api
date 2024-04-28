@@ -35,6 +35,8 @@ type UserStore interface {
 	GetUser(ctx context.Context, id string) (*types.User, error)
 	GetAllUsers(ctx context.Context) ([]*types.User, error)
 	InsertUser(ctx context.Context, user *types.User) (*types.User, error)
+	DeleteUser(ctx context.Context, id string) error
+	UpdateUser(ctx context.Context, id string, user *types.User) error
 }
 
 func (store *MongoUserStore) GetUser(ctx context.Context, id string) (*types.User, error) {
@@ -45,7 +47,7 @@ func (store *MongoUserStore) GetUser(ctx context.Context, id string) (*types.Use
 		return nil, err
 	}
 
-	if err := store.collection.FindOne(ctx, bson.M{"id": oid}).Decode(&foundUser); err != nil {
+	if err := store.collection.FindOne(ctx, bson.M{"_id": oid}).Decode(&foundUser); err != nil {
 		return nil, err
 	}
 	return &foundUser, nil
@@ -78,4 +80,42 @@ func (store *MongoUserStore) GetAllUsers(ctx context.Context) ([]*types.User, er
 		return nil, err
 	}
 	return users, nil
+}
+
+func (store *MongoUserStore) DeleteUser(ctx context.Context, id string) error {
+	oid, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return err
+	}
+	one, err := store.collection.DeleteOne(ctx, bson.M{"_id": oid})
+	if err != nil {
+		return err
+	}
+
+	log.Info("deleted user ", one.DeletedCount)
+	return nil
+}
+
+func (store *MongoUserStore) UpdateUser(ctx context.Context, id string, user *types.User) error {
+
+	var foundUser types.User
+	oid, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return err
+	}
+	filter := bson.D{{"_id", oid}}
+
+	if err := store.collection.FindOne(ctx, bson.M{"_id": oid}).Decode(&foundUser); err != nil {
+		return fmt.Errorf("user with id %s not found", id)
+	}
+
+	user.Password = foundUser.Password
+
+	result, err := store.collection.ReplaceOne(ctx, filter, user)
+	if err != nil {
+		return err
+	}
+	log.Info("updated user count ", result.ModifiedCount)
+
+	return nil
 }

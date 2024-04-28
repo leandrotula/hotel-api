@@ -11,6 +11,8 @@ type UserHandler interface {
 	HandleGetUser(c *fiber.Ctx) error
 	HandleGetUsers(ctx *fiber.Ctx) error
 	HandleCreateUser(c *fiber.Ctx) error
+	HandleDeleteUser(ctx *fiber.Ctx) error
+	HandleUpdateUser(c *fiber.Ctx) error
 }
 
 func NewUserHandler(store store.UserStore) *UserApiHandler {
@@ -57,4 +59,31 @@ func (u *UserApiHandler) HandleCreateUser(c *fiber.Ctx) error {
 		return err
 	}
 	return c.JSON(insertedUser)
+}
+
+func (u *UserApiHandler) HandleDeleteUser(ctx *fiber.Ctx) error {
+	err := u.storeUser.DeleteUser(ctx.Context(), ctx.Params("id"))
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (u *UserApiHandler) HandleUpdateUser(ctx *fiber.Ctx) error {
+
+	var (
+		id   = ctx.Params("id")
+		user types.UpdateUserPayload
+	)
+	if err := ctx.BodyParser(&user); err != nil {
+		return err
+	}
+
+	userToUpdate := types.NewUpdateUser(&user)
+	err := u.storeUser.UpdateUser(ctx.Context(), id, userToUpdate)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
