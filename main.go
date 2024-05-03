@@ -3,9 +3,7 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/log"
 	"github.com/leandrotula/hotelapi/api"
 	"github.com/leandrotula/hotelapi/store"
 	"github.com/leandrotula/hotelapi/util"
@@ -23,7 +21,6 @@ func main() {
 
 	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(uriMongoDb))
 	if err != nil {
-		log.Fatal(fmt.Errorf("error connecting to MongoDB: %v", err))
 		panic(err)
 	}
 	userHandler := api.NewUserHandler(store.NewMongoUserStore(client, util.NewEncryptionService()))
@@ -38,7 +35,6 @@ func main() {
 
 	err = appServer.Listen(*givenPort)
 	if err != nil {
-		log.Fatal(fmt.Errorf("error listening on port %v: %v", *givenPort, err))
 		panic(err)
 	}
 }
