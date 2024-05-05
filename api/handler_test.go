@@ -8,14 +8,26 @@ import (
 	"github.com/leandrotula/hotelapi/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/suite"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 )
 
+type SuiteTest struct {
+	suite.Suite
+}
+
 type HandlerMock struct {
 	mock.Mock
+}
+
+type HandlerInputData struct {
+	expectedCode int
+	mockedUsers  []types.User
+	userId       string
+	expectedSize int
 }
 
 func (h *HandlerMock) GetUser(ctx context.Context, id string) (*types.User, error) {
@@ -31,6 +43,11 @@ func (h *HandlerMock) GetAllUsers(ctx context.Context) ([]*types.User, error) {
 	if !ok {
 		panic("invalid argument")
 	}
+
+	err := args.Error(1)
+	if len(content) == 0 {
+		return nil, err
+	}
 	return []*types.User{
 		{
 			FirstName: content[0].FirstName,
@@ -38,7 +55,7 @@ func (h *HandlerMock) GetAllUsers(ctx context.Context) ([]*types.User, error) {
 			Email:     content[0].Email,
 			ID:        content[0].ID,
 		},
-	}, args.Error(1)
+	}, err
 
 }
 
@@ -59,62 +76,109 @@ func (h *HandlerMock) UpdateUser(ctx context.Context, id string, user *types.Use
 	return nil
 }
 
-func TestUserApiHandler_HandleGetUser(t *testing.T) {
+func (s *SuiteTest) TestUserApiHandler_HandleGetUser() {
 
-	app := fiber.New()
-	defaultId := "662ecba995e45cd5628b088f"
-	storeMock := new(HandlerMock)
-
-	storeMock.On("GetUser", mock.Anything, mock.Anything).Return(&types.User{
-		FirstName: "test user",
-		LastName:  "test user",
-		Email:     "test@test.com",
-		ID:        defaultId,
-	}, nil)
-
-	handlerService := NewUserHandler(storeMock)
-
-	app.Get("/:id", handlerService.HandleGetUser)
-
-	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/%s", defaultId), nil)
-
-	result, _ := app.Test(req)
-
-	assert.NotNil(t, result)
-	assert.Equal(t, http.StatusOK, result.StatusCode)
-}
-
-func TestUserApiHandler_HandleGetUsers(t *testing.T) {
-
-	app := fiber.New()
-	storeMock := new(HandlerMock)
-
-	mockUsers := []types.User{
+	allScenarios := []HandlerInputData{
 		{
-			FirstName: "test user2",
-			LastName:  "test user2",
-			Email:     "test2@test.com",
-			ID:        "772ecba995e45cd5628b088f",
+			expectedCode: http.StatusOK,
+			mockedUsers: []types.User{
+				{
+					FirstName: "test user2",
+					LastName:  "test user2",
+					Email:     "test2@test.com",
+					ID:        "772ecba995e45cd5628b088f",
+				},
+			},
+			userId: "772ecba995e45cd5628b088f",
+		},
+		{
+			expectedCode: http.StatusOK,
+			mockedUsers:  []types.User{{}},
+			userId:       "772ecba995e45cd5628b088f",
 		},
 	}
-	storeMock.On("GetAllUsers", mock.Anything).Return(mockUsers, nil)
 
-	handlerService := NewUserHandler(storeMock)
+	for _, data := range allScenarios {
 
-	app.Get("/", handlerService.HandleGetUsers)
+		app := fiber.New()
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+		storeMock := new(HandlerMock)
 
-	result, _ := app.Test(req)
+		storeMock.On("GetUser", mock.Anything, mock.Anything).Return(&data.mockedUsers[0], nil)
 
-	var users []types.User
-	content, _ := io.ReadAll(result.Body)
+		handlerService := NewUserHandler(storeMock)
 
-	err := json.Unmarshal(content, &users)
-	assert.NoError(t, err)
+		app.Get("/:id", handlerService.HandleGetUser)
 
-	fmt.Println(users)
-	assert.NotNil(t, result)
-	assert.Equal(t, http.StatusOK, result.StatusCode)
-	assert.Equal(t, 1, len(users))
+		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/%s", data.userId), nil)
+
+		result, _ := app.Test(req)
+
+		if result != nil {
+			assert.NotNil(s.T(), result)
+			assert.Equal(s.T(), data.expectedCode, result.StatusCode)
+		}
+
+	}
+
+}
+
+func (s *SuiteTest) TestUserApiHandler_HandleGetUsers() {
+
+	allScenarios := []HandlerInputData{
+		{
+			expectedCode: http.StatusOK,
+			mockedUsers: []types.User{
+				{
+					FirstName: "test user2",
+					LastName:  "test user2",
+					Email:     "test2@test.com",
+					ID:        "772ecba995e45cd5628b088f",
+				},
+			},
+			expectedSize: 1,
+		},
+		{
+			expectedCode: http.StatusOK,
+			mockedUsers:  []types.User{},
+			expectedSize: 0,
+		},
+	}
+
+	for _, data := range allScenarios {
+
+		app := fiber.New()
+
+		storeMock := new(HandlerMock)
+
+		storeMock.On("GetAllUsers", mock.Anything).Return(data.mockedUsers, nil)
+
+		handlerService := NewUserHandler(storeMock)
+
+		app.Get("/", handlerService.HandleGetUsers)
+
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+
+		result, _ := app.Test(req)
+
+		if result != nil {
+			var users []types.User
+			content, _ := io.ReadAll(result.Body)
+
+			err := json.Unmarshal(content, &users)
+			assert.NoError(s.T(), err)
+
+			assert.NotNil(s.T(), result)
+			assert.Equal(s.T(), data.expectedCode, result.StatusCode)
+			assert.Equal(s.T(), data.expectedSize, len(users))
+		} else {
+			assert.Nil(s.T(), result)
+		}
+
+	}
+
+}
+
+func TestSuite(t *testing.T) {
+	suite.Run(t, new(SuiteTest))
 }

@@ -5,6 +5,7 @@ import (
 	"github.com/gofiber/fiber/v2/log"
 	"github.com/leandrotula/hotelapi/store"
 	"github.com/leandrotula/hotelapi/types"
+	"net/http"
 )
 
 type UserHandler interface {
@@ -33,6 +34,9 @@ func (u *UserApiHandler) HandleGetUser(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
+	if user == nil {
+		return c.Status(http.StatusNotFound).JSON(map[string]string{"message": "user not found"})
+	}
 	return c.JSON(user)
 }
 
@@ -41,6 +45,11 @@ func (u *UserApiHandler) HandleGetUsers(ctx *fiber.Ctx) error {
 	allUsers, err := u.storeUser.GetAllUsers(ctx.Context())
 	if err != nil {
 		return err
+	}
+
+	if allUsers == nil {
+		return ctx.Status(http.StatusOK).JSON([]types.User{})
+
 	}
 	return ctx.JSON(allUsers)
 

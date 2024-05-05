@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/gofiber/fiber/v2/log"
 	"github.com/leandrotula/hotelapi/types"
@@ -48,6 +49,10 @@ func (store *MongoUserStore) GetUser(ctx context.Context, id string) (*types.Use
 	}
 
 	if err := store.collection.FindOne(ctx, bson.M{"_id": oid}).Decode(&foundUser); err != nil {
+
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	return &foundUser, nil
