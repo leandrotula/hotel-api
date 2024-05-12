@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/gofiber/fiber/v2/log"
 	"github.com/leandrotula/hotelapi/types"
 	"github.com/leandrotula/hotelapi/util"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"log"
 )
 
 const (
@@ -36,6 +36,7 @@ type UserStore interface {
 	GetUser(ctx context.Context, id string) (*types.User, error)
 	GetAllUsers(ctx context.Context) ([]*types.User, error)
 	InsertUser(ctx context.Context, user *types.User) (*types.User, error)
+	InsertMany(ctx context.Context, user []*types.User) ([]*types.User, error)
 	DeleteUser(ctx context.Context, id string) error
 	UpdateUser(ctx context.Context, id string, user *types.User) error
 }
@@ -69,7 +70,8 @@ func (store *MongoUserStore) InsertUser(ctx context.Context, user *types.User) (
 	if err != nil {
 		return nil, err
 	}
-	log.Info(fmt.Sprintf("Inserted a new user with id: %s", result.InsertedID))
+
+	log.Println(fmt.Sprintf("Inserted a new user with id: %s", result.InsertedID))
 	return user, nil
 }
 
@@ -97,7 +99,7 @@ func (store *MongoUserStore) DeleteUser(ctx context.Context, id string) error {
 		return err
 	}
 
-	log.Info("deleted user ", one.DeletedCount)
+	log.Println("deleted user ", one.DeletedCount)
 	return nil
 }
 
@@ -120,7 +122,31 @@ func (store *MongoUserStore) UpdateUser(ctx context.Context, id string, user *ty
 	if err != nil {
 		return err
 	}
-	log.Info("updated user count ", result.ModifiedCount)
+	log.Println("updated user count ", result.ModifiedCount)
 
 	return nil
+}
+
+func (store *MongoUserStore) InsertMany(ctx context.Context, users []*types.User) ([]*types.User, error) {
+
+	for _, userItem := range users {
+		newPassword, err := store.passwordEncryptor.Encrypt(userItem.Password)
+		if err != nil {
+			return nil, err
+		}
+		userItem.Password = newPassword
+	}
+
+	var newUsers []interface{}
+
+	for _, userItem := range users {
+		newUsers = append(newUsers, userItem)
+	}
+
+	_, err := store.collection.InsertMany(ctx, newUsers)
+	if err != nil {
+		return nil, err
+	}
+
+	return users, nil
 }
